@@ -16,7 +16,7 @@ internal sealed class MainWindow : Window
     private readonly NativeWebView _previewWeb = new() { IsVisible = false };
     private readonly RadioButton _fit = new() { Content = "Ajustar · imagen completa", GroupName = "mode", IsChecked = true };
     private readonly RadioButton _fill = new() { Content = "Rellenar · recortar bordes", GroupName = "mode" };
-    private readonly TextBox _intervalValue = new() { Text = "30", Watermark = "Cantidad", Width = 95 };
+    private readonly TextBox _intervalValue = new() { Text = "30", PlaceholderText = "Cantidad", Width = 95 };
     private readonly ComboBox _intervalUnit = new() { ItemsSource = new[] { "segundos", "minutos", "horas", "días" }, SelectedIndex = 0, Width = 115 };
     private readonly ComboBox _timingMode = new() { ItemsSource = new[] { "Manual", "Automático · 5 minutos" }, SelectedIndex = 0 };
     private readonly TextBlock _transitionStatus = new() { Text = "Transición detenida", Foreground = Brush("#8EF0D0"), TextWrapping = TextWrapping.Wrap };
@@ -65,25 +65,7 @@ internal sealed class MainWindow : Window
         panel.Children.Add(new TextBlock { Text = "Fondos para Linux con ajuste de imagen y páginas HTML animadas en X11.", TextWrapping = TextWrapping.Wrap, Opacity = .75 });
         panel.Children.Add(new Border { Background = Brush("#101827"), CornerRadius = new CornerRadius(14), Padding = new Thickness(14), Child = new StackPanel { Spacing = 10, Children = { _fileLabel, Button("Elegir archivo", ChooseFile) } } });
         panel.Children.Add(new Border { Background = Brush("#101827"), CornerRadius = new CornerRadius(14), Padding = new Thickness(14), Child = new StackPanel { Spacing = 9, Children = { new TextBlock { Text = "AJUSTE DE IMAGEN", FontWeight = FontWeight.Bold, Opacity = .7 }, _fit, _fill } } });
-        panel.Children.Add(new Border
-        {
-            Background = Brush("#101827"), CornerRadius = new CornerRadius(14), Padding = new Thickness(14),
-            Child = new StackPanel
-            {
-                Spacing = 8,
-                Children =
-                {
-                    new TextBlock { Text = "TRANSICIÓN DE IMÁGENES", FontWeight = FontWeight.Bold, Opacity = .7 },
-                    Button("Elegir imágenes", ChooseTransition),
-                    _transitionStatus,
-                    _timingMode,
-                    new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { _intervalValue, _intervalUnit } },
-                    Button("Iniciar transición", StartTransition, accent: true),
-                    _pauseTransitionButton = Button("Pausar transición", PauseTransition),
-                    Button("Eliminar transición", RemoveTransition)
-                }
-            }
-        });
+        panel.Children.Add(BuildTransitionPanel());
         panel.Children.Add(Button("Aplicar fondo", ApplySelected, accent: true));
         panel.Children.Add(_pauseBackgroundButton = Button("Pausar fondo animado", PauseBackground));
         panel.Children.Add(Button("Enviar detrás · mostrar apps", SendBehind));
@@ -102,6 +84,27 @@ internal sealed class MainWindow : Window
         Grid.SetColumn(preview, 1);
         grid.Children.Add(preview);
         return grid;
+    }
+
+    private Control BuildTransitionPanel()
+    {
+        _pauseTransitionButton = Button("Pausar transición", PauseTransition);
+        var controls = new StackPanel
+        {
+            Spacing = 8,
+            Children =
+            {
+                new TextBlock { Text = "TRANSICIÓN DE IMÁGENES", FontWeight = FontWeight.Bold, Opacity = .7 },
+                Button("Elegir imágenes", ChooseTransition),
+                _transitionStatus,
+                _timingMode,
+                new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { _intervalValue, _intervalUnit } },
+                Button("Iniciar transición", StartTransition, accent: true),
+                _pauseTransitionButton,
+                Button("Eliminar transición", RemoveTransition)
+            }
+        };
+        return new Border { Background = Brush("#101827"), CornerRadius = new CornerRadius(14), Padding = new Thickness(14), Child = controls };
     }
 
     private async void ChooseFile(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
