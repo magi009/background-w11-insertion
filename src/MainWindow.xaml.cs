@@ -282,16 +282,28 @@ public partial class MainWindow : Window
 
     private void SendBack_Click(object sender, RoutedEventArgs e)
     {
+        string? wallpaperWarning = null;
         try
         {
             if (_dynamicPath is null && _renderedWallpaperPath is not null && File.Exists(_renderedWallpaperPath))
                 ApplyWindowsWallpaper(_renderedWallpaperPath);
-            _wallpaperHost?.SendBehindApps();
-            StatusText.Text = "Apps e iconos visibles; el fondo adaptado sigue aplicado detrás de ellos.";
         }
         catch (Exception ex)
         {
-            StatusText.Text = $"No se pudo mostrar el escritorio: {ex.Message}";
+            wallpaperWarning = ex.Message;
+        }
+
+        try
+        {
+            // Always lower/hide the full-screen host even if Windows rejects a wallpaper refresh.
+            _wallpaperHost?.SendBehindApps();
+            StatusText.Text = wallpaperWarning is null
+                ? "Apps e iconos visibles; el fondo adaptado sigue aplicado detrás de ellos."
+                : $"Apps visibles. Windows no pudo actualizar el fondo: {wallpaperWarning}";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"No se pudo cambiar la capa del fondo: {ex.Message}";
         }
     }
 
