@@ -163,6 +163,8 @@ public partial class WallpaperHostWindow : Window
         // desktop WorkerW. This keeps it below Explorer's icon view and normal apps.
         SetWindowLong(hwnd, -16, WsChild | WsVisible | WsClipSiblings | WsClipChildren);
         SetParent(hwnd, _desktopParent);
+        if (GetParent(hwnd) != _desktopParent)
+            throw new InvalidOperationException("Windows no confirmó que el fondo quedó dentro del escritorio.");
         PositionAcrossDesktop(hwnd, _desktopParent, HwndBottom, activate: false);
     }
 
@@ -262,38 +264,23 @@ public partial class WallpaperHostWindow : Window
         var progman = FindWindow("Progman", null);
         if (progman == IntPtr.Zero) throw new InvalidOperationException("Windows no encontró el escritorio.");
 
-        // Ask Explorer to create its wallpaper WorkerW. The documented shell
-        // message is parameter-sensitive: zero parameters can leave no WorkerW
-        // behind SHELLDLL_DefView, causing an HTML host to cover desktop icons.
+        // Ask Explorer to finish arranging its icon view before locating its
+        // actual parent. The host is inserted as a sibling below SHELLDLL_DefView,
+        // so it cannot cover desktop icons even on Windows 11's WorkerW layouts.
         SendMessageTimeout(progman, 0x052C, new IntPtr(0xD), new IntPtr(0x1), 0, 1000, out _);
 
-        var desktopParent = IntPtr.Zero;
+        var iconViewParent = IntPtr.Zero;
         EnumWindows((top, _) =>
         {
             if (FindWindowEx(top, IntPtr.Zero, "SHELLDLL_DefView", null) == IntPtr.Zero)
                 return true;
 
-            // The WorkerW immediately after the icon-view window in top-level
-            // z-order is the wallpaper layer, beneath desktop icons.
-            desktopParent = FindWindowEx(IntPtr.Zero, top, "WorkerW", null);
-            if (desktopParent == IntPtr.Zero)
-            {
-                // Some Windows builds host the icon view directly in Progman.
-                // As a fallback, parent to its container and insert at HWND_BOTTOM.
-                desktopParent = top;
-            }
+            iconViewParent = top;
             return false;
         }, IntPtr.Zero);
 
-        if (desktopParent != IntPtr.Zero) return desktopParent;
-
-        // Explorer may place SHELLDLL_DefView directly in Progman on some
-        // Windows 11 configurations. A bottom child of Progman remains below
-        // its icon-view child and preserves normal app z-order.
-        if (FindWindowEx(progman, IntPtr.Zero, "SHELLDLL_DefView", null) != IntPtr.Zero)
-            return progman;
-
-        throw new InvalidOperationException("Windows no encontró la capa de iconos del escritorio.");
+        if (iconViewParent != IntPtr.Zero) return iconViewParent;
+        throw new InvalidOperationException("Windows no encontró el contenedor de los iconos del escritorio.");
     }
 
     private static void PositionAcrossDesktop(IntPtr hwnd, IntPtr parent, IntPtr insertAfter, bool activate)
@@ -341,6 +328,7 @@ public partial class WallpaperHostWindow : Window
     [DllImport("user32.dll", CharSet = CharSet.Auto)] private static extern IntPtr FindWindow(string className, string? windowName);
     [DllImport("user32.dll", CharSet = CharSet.Auto)] private static extern IntPtr FindWindowEx(IntPtr parent, IntPtr after, string className, string? windowName);
     [DllImport("user32.dll", SetLastError = true)] private static extern IntPtr SetParent(IntPtr child, IntPtr newParent);
+    [DllImport("user32.dll")] private static extern IntPtr GetParent(IntPtr hwnd);
     [DllImport("user32.dll", SetLastError = true)] private static extern bool ClientToScreen(IntPtr hwnd, ref NativePoint point);
     [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW", SetLastError = true)] private static extern IntPtr SetWindowLongPtr64(IntPtr hWnd, int index, IntPtr value);
     [DllImport("user32.dll", EntryPoint = "SetWindowLongW", SetLastError = true)] private static extern int SetWindowLong32(IntPtr hWnd, int index, int value);
