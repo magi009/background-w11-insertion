@@ -1,6 +1,7 @@
 <Window x:Class="FondoClaro.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         Title="FondoClaro" Height="760" Width="1120" MinHeight="640" MinWidth="900"
         WindowStartupLocation="CenterScreen" Background="#080E18" Foreground="{StaticResource Ink}">
   <Grid Margin="28">
