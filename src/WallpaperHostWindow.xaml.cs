@@ -30,7 +30,9 @@ public partial class WallpaperHostWindow : Window
     private void AttachBehindIcons(object? sender, EventArgs e)
     {
         var hwnd = new WindowInteropHelper(this).Handle;
+        WindowState = WindowState.Normal;
         var progman = FindWindow("Progman", null);
+        if (progman == IntPtr.Zero) throw new InvalidOperationException("Windows no encontró el escritorio para colocar el fondo HTML.");
         SendMessageTimeout(progman, 0x052C, IntPtr.Zero, IntPtr.Zero, 0, 1000, out _);
         IntPtr worker = IntPtr.Zero;
         EnumWindows((top, _) =>
@@ -40,10 +42,11 @@ public partial class WallpaperHostWindow : Window
             return true;
         }, IntPtr.Zero);
         if (worker == IntPtr.Zero) worker = progman;
+        SetWindowLong(hwnd, -16, 0x52000000); // WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN
         SetParent(hwnd, worker);
-        SetWindowLong(hwnd, -16, 0x50000000); // WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS
         var bounds = System.Windows.Forms.SystemInformation.VirtualScreen;
-        SetWindowPos(hwnd, IntPtr.Zero, bounds.Left, bounds.Top, bounds.Width, bounds.Height, 0x0040 | 0x0010);
+        if (!SetWindowPos(hwnd, IntPtr.Zero, bounds.Left, bounds.Top, bounds.Width, bounds.Height, 0x0040 | 0x0010 | 0x0020))
+            throw new InvalidOperationException($"Windows no pudo colocar el fondo HTML. Error {Marshal.GetLastWin32Error()}.");
     }
 
     private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);

@@ -103,7 +103,7 @@ public partial class MainWindow : Window
                 var encoder = new JpegBitmapEncoder { QualityLevel = 94 };
                 encoder.Frames.Add(BitmapFrame.Create(wallpaper)); encoder.Save(stream);
             }
-            if (!SystemParametersInfo(20, 0, target, 3)) throw new InvalidOperationException("Windows no aceptó la imagen como fondo.");
+            ApplyWindowsWallpaper(target);
             StatusText.Text = $"Fondo aplicado a {width} × {height}. Se guardó una copia adaptada.";
         }
         catch (Exception ex) { System.Windows.MessageBox.Show($"No se pudo aplicar el fondo.\n\n{ex.Message}", "FondoClaro", MessageBoxButton.OK, MessageBoxImage.Error); }
@@ -140,6 +140,35 @@ public partial class MainWindow : Window
     }
 
     protected override void OnClosed(EventArgs e) { _wallpaperHost?.Close(); base.OnClosed(e); }
+
+    private static void ApplyWindowsWallpaper(string path)
+    {
+        Exception? comError = null;
+        object? desktopWallpaper = null;
+        try
+        {
+            var type = Type.GetTypeFromCLSID(new Guid("C2CF3110-460E-4FC1-B9D0-8A1C0C9CC4BD"), throwOnError: true)!;
+            desktopWallpaper = Activator.CreateInstance(type) ?? throw new InvalidOperationException("Windows no creó el servicio de fondos.");
+            ((IDesktopWallpaper)desktopWallpaper).SetWallpaper(null, path);
+            return;
+        }
+        catch (Exception ex) { comError = ex; }
+        finally
+        {
+            if (desktopWallpaper is not null && Marshal.IsComObject(desktopWallpaper)) Marshal.FinalReleaseComObject(desktopWallpaper);
+        }
+
+        if (!SystemParametersInfo(20, 0, path, 3))
+            throw new InvalidOperationException($"Windows rechazó el fondo. Error del sistema: {Marshal.GetLastWin32Error()}. {comError?.Message}");
+    }
+
+    [ComImport]
+    [Guid("B92B56A9-8B55-4E14-9A89-0199BBB6F93B")]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IDesktopWallpaper
+    {
+        void SetWallpaper([MarshalAs(UnmanagedType.LPWStr)] string? monitorId, [MarshalAs(UnmanagedType.LPWStr)] string wallpaper);
+    }
 
     [DllImport("user32.dll", EntryPoint = "SystemParametersInfoW", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern bool SystemParametersInfo(uint action, uint param, string value, uint flags);
