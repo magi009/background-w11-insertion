@@ -19,9 +19,9 @@ App WPF para Windows 10/11. Mantiene la proporción original al adaptar fondos:
 - La app aplica imágenes al monitor principal. HTML y medios se extienden al área virtual de monitores conectados.
 - La frase “cualquier archivo” está limitada a formatos que el decodificador de Windows o WebView2 puedan leer. RAW de cámara, PSD y formatos propietarios pueden requerir códecs o aplicaciones adicionales.
 - La mejora por IA todavía no está incluida. El ajuste de tamaño no necesita IA; una mejora real por IA requiere un modelo local y usa CPU/GPU/RAM mientras trabaja, por lo que no puede ofrecer consumo literalmente cero. Esta versión no procesa nada en segundo plano.
-- El fondo HTML puede usar CPU/GPU mientras sus animaciones están encendidas. El botón **Pausar HTML** detiene las animaciones y transiciones CSS; una página que use bucles JavaScript podría seguir ejecutándolos.
+- El fondo HTML o multimedia puede usar CPU/GPU mientras está encendido. **Pausar fondo** detiene animaciones CSS y video/audio; una página que use bucles JavaScript podría seguir ejecutándolos.
 - HTML puede contener scripts y recursos externos. Carga solamente archivos y páginas en los que confíes.
 
 ## Nota técnica
 
-El HTML se renderiza con WebView2; la app necesita el runtime de Microsoft Edge WebView2. La imagen se adapta y guarda en `%LocalAppData%\FondoClaro\fondo-adaptado.png`, y luego Windows la establece como fondo.
+HTML y formatos multimedia se renderizan con WebView2; la app necesita el runtime de Microsoft Edge WebView2. La imagen se adapta y guarda en `%LocalAppData%\FondoClaro\fondo-adaptado.jpg`, y luego Windows la establece como fondo.
