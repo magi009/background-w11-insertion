@@ -1,6 +1,5 @@
 using System.IO;
 using System.Runtime.InteropServices;
-using System.Text;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
@@ -20,8 +19,6 @@ public partial class MainWindow : Window
     private const uint VkF11 = 0x7A;
     private string? _imagePath;
     private string? _dynamicPath;
-    private string? _originalWallpaperPath;
-    private bool _capturedOriginalWallpaper;
     private WallpaperHostWindow? _wallpaperHost;
     private DispatcherTimer? _transitionTimer;
     private readonly List<string> _transitionFiles = new();
@@ -142,12 +139,11 @@ public partial class MainWindow : Window
         {
             if (_dynamicPath is not null)
             {
-                RememberOriginalWallpaper();
                 _wallpaperHost?.Close();
-                _wallpaperHost = new WallpaperHostWindow(_dynamicPath);
+                _wallpaperHost = new WallpaperHostWindow(_dynamicPath, htmlContent: true);
                 _wallpaperHost.TaskbarShown += () => StatusText.Text = "Barra de tareas visible; fondo detrás de las ventanas.";
                 _wallpaperHost.Show();
-                SetDynamicButtons(true);
+                SetDynamicButtons(true, canPause: true);
                 RemoveBackgroundButton.IsEnabled = true;
                 StatusText.Text = "Fondo activo detrás de las apps. Usa los botones para cambiar su capa.";
                 return;
@@ -160,14 +156,10 @@ public partial class MainWindow : Window
 
     private void ApplyStaticImage(string path)
     {
-        RememberOriginalWallpaper();
-        _wallpaperHost?.Close(); _wallpaperHost = null;
         _dynamicPath = null; _imagePath = path;
-        SetDynamicButtons(false);
         var source = LoadImage(path);
-        var screens = System.Windows.Forms.Screen.AllScreens;
-        var screen = System.Windows.Forms.Screen.PrimaryScreen ?? screens[0];
-        var width = screen.Bounds.Width; var height = screen.Bounds.Height;
+        var bounds = System.Windows.Forms.SystemInformation.VirtualScreen;
+        var width = bounds.Width; var height = bounds.Height;
         var wallpaper = RenderWallpaper(source, width, height, _fill);
         var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FondoClaro");
         Directory.CreateDirectory(folder);
@@ -177,9 +169,20 @@ public partial class MainWindow : Window
             var encoder = new JpegBitmapEncoder { QualityLevel = 94 };
             encoder.Frames.Add(BitmapFrame.Create(wallpaper)); encoder.Save(stream);
         }
-        ApplyWindowsWallpaper(target);
+        if (_wallpaperHost is null || !_wallpaperHost.IsVisible)
+        {
+            _wallpaperHost?.Close();
+            _wallpaperHost = new WallpaperHostWindow(target, htmlContent: false);
+            _wallpaperHost.TaskbarShown += () => StatusText.Text = "Barra de tareas visible; fondo detrás de las ventanas.";
+            _wallpaperHost.Show();
+        }
+        else
+        {
+            _wallpaperHost.ShowImage(target);
+        }
+        SetDynamicButtons(true, canPause: false);
         RemoveBackgroundButton.IsEnabled = true;
-        StatusText.Text = $"Fondo aplicado a {width} × {height}.";
+        StatusText.Text = $"Fondo aplicado a {width} × {height}; puedes cambiarlo de capa con los botones.";
     }
 
     private void StartTransition_Click(object sender, RoutedEventArgs e)
@@ -285,19 +288,10 @@ public partial class MainWindow : Window
         _transitionTimer?.Stop(); _transitionTimer = null;
         _wallpaperHost?.Close(); _wallpaperHost = null;
         SetDynamicButtons(false);
-        try
-        {
-            if (!string.IsNullOrWhiteSpace(_originalWallpaperPath) && File.Exists(_originalWallpaperPath))
-                ApplyWindowsWallpaper(_originalWallpaperPath);
-            else if (!SystemParametersInfo(20, 0, string.Empty, 3))
-                throw new InvalidOperationException($"Windows no pudo quitar el fondo. Error {Marshal.GetLastWin32Error()}.");
-            _originalWallpaperPath = null; _capturedOriginalWallpaper = false;
-            _imagePath = null; _dynamicPath = null;
-            RemoveBackgroundButton.IsEnabled = false;
-            RemoveTransition_Click(this, new RoutedEventArgs());
-            StatusText.Text = "Fondo eliminado y fondo anterior restaurado.";
-        }
-        catch (Exception ex) { StatusText.Text = $"No se pudo eliminar el fondo: {ex.Message}"; }
+        _imagePath = null; _dynamicPath = null;
+        RemoveBackgroundButton.IsEnabled = false;
+        RemoveTransition_Click(this, new RoutedEventArgs());
+        StatusText.Text = "Fondo eliminado. Se muestra de nuevo el fondo que Windows tenía antes.";
     }
 
     private void ToggleHtml_Click(object sender, RoutedEventArgs e)
@@ -309,21 +303,12 @@ public partial class MainWindow : Window
         StatusText.Text = pause ? "Contenido en pausa." : "Contenido reanudado.";
     }
 
-    private void SetDynamicButtons(bool enabled)
+    private void SetDynamicButtons(bool enabled, bool canPause = false)
     {
-        ToggleHtmlButton.IsEnabled = enabled;
+        ToggleHtmlButton.IsEnabled = enabled && canPause;
         SendBackButton.IsEnabled = enabled;
         BringFrontButton.IsEnabled = enabled;
-        if (enabled) ToggleHtmlButton.Content = "Pausar fondo";
-    }
-
-    private void RememberOriginalWallpaper()
-    {
-        if (_capturedOriginalWallpaper) return;
-        _capturedOriginalWallpaper = true;
-        var path = new StringBuilder(32768);
-        if (SystemParametersInfoGet(0x73, (uint)path.Capacity, path, 0) && path.Length > 0)
-            _originalWallpaperPath = path.ToString();
+        ToggleHtmlButton.Content = "Pausar fondo";
     }
 
     private static string FormatCountdown(TimeSpan value)
@@ -354,34 +339,6 @@ public partial class MainWindow : Window
         var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32); bitmap.Render(canvas); bitmap.Freeze(); return bitmap;
     }
 
-    private static void ApplyWindowsWallpaper(string path)
-    {
-        Exception? comError = null;
-        object? desktopWallpaper = null;
-        try
-        {
-            var type = Type.GetTypeFromCLSID(new Guid("C2CF3110-460E-4FC1-B9D0-8A1C0C9CC4BD"), throwOnError: true)!;
-            desktopWallpaper = Activator.CreateInstance(type) ?? throw new InvalidOperationException("Windows no creó el servicio de fondos.");
-            ((IDesktopWallpaper)desktopWallpaper).SetWallpaper(null, path);
-            return;
-        }
-        catch (Exception ex) { comError = ex; }
-        finally
-        {
-            if (desktopWallpaper is not null && Marshal.IsComObject(desktopWallpaper)) Marshal.FinalReleaseComObject(desktopWallpaper);
-        }
-        if (!SystemParametersInfo(20, 0, path, 3))
-            throw new InvalidOperationException($"Windows rechazó el fondo. Error del sistema: {Marshal.GetLastWin32Error()}. {comError?.Message}");
-    }
-
-    [ComImport]
-    [Guid("B92B56A9-8B55-4E14-9A89-0199BBB6F93B")]
-    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    private interface IDesktopWallpaper
-    {
-        void SetWallpaper([MarshalAs(UnmanagedType.LPWStr)] string? monitorId, [MarshalAs(UnmanagedType.LPWStr)] string wallpaper);
-    }
-
     protected override void OnClosed(EventArgs e)
     {
         if (_hotkeyRegistered) UnregisterHotKey(new WindowInteropHelper(this).Handle, WallpaperHotkeyId);
@@ -390,8 +347,4 @@ public partial class MainWindow : Window
 
     [DllImport("user32.dll", SetLastError = true)] private static extern bool RegisterHotKey(IntPtr hwnd, int id, uint modifiers, uint virtualKey);
     [DllImport("user32.dll", SetLastError = true)] private static extern bool UnregisterHotKey(IntPtr hwnd, int id);
-    [DllImport("user32.dll", EntryPoint = "SystemParametersInfoW", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern bool SystemParametersInfo(uint action, uint param, string value, uint flags);
-    [DllImport("user32.dll", EntryPoint = "SystemParametersInfoW", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern bool SystemParametersInfoGet(uint action, uint param, StringBuilder value, uint flags);
 }
