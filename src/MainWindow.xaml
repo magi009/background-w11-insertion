@@ -55,7 +55,7 @@
       <Button x:Name="ApplyButton" Content="Adaptar y mejorar ahora" Click="Apply_Click" Margin="0,18,0,0" Background="#117A68" BorderBrush="#22A88F" FontWeight="SemiBold" />
       <Button x:Name="ToggleHtmlButton" Content="Pausar fondo" Click="ToggleHtml_Click" Margin="0,9,0,0" IsEnabled="False" />
       <Button x:Name="SendBackButton" Content="Mostrar apps ahora · enviar detrás" Click="SendBack_Click" Margin="0,9,0,0" IsEnabled="False" />
-      <Button x:Name="BringFrontButton" Content="Traer al frente · cubrir todo" Click="BringFront_Click" Margin="0,9,0,0" IsEnabled="False" />
+      <Button x:Name="BringFrontButton" Content="Pantalla completa · cubrir todo" Click="BringFront_Click" Margin="0,9,0,0" IsEnabled="False" />
       <TextBlock x:Name="HotkeyText" Text="Atajo: Ctrl + Alt + F11" Foreground="{StaticResource Muted}" FontSize="11" TextWrapping="Wrap" Margin="0,7,0,0" />
       <Button x:Name="RemoveBackgroundButton" Content="Eliminar fondo" Click="RemoveBackground_Click" Margin="0,9,0,0" IsEnabled="False" />
       <TextBlock x:Name="StatusText" Text="Ajuste local sin procesos en segundo plano." Foreground="{StaticResource Muted}" FontSize="12" TextWrapping="Wrap" Margin="0,11,0,0" />
@@ -68,6 +68,10 @@
         <Border Background="#050817" Opacity="0.14" />
         <Image x:Name="PreviewImage" Stretch="Uniform" Margin="28" />
         <wv2:WebView2 x:Name="PreviewWeb" Visibility="Collapsed" />
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="14">
+          <Button x:Name="PreviewFitButton" Content="⤢ Ajustar pantalla" Click="FitScreen_Click" IsEnabled="False" Margin="0,0,8,0" Padding="12,8" Background="#D9141D2B" />
+          <Button x:Name="PreviewFullscreenButton" Content="⛶ Pantalla completa" Click="PreviewFullscreen_Click" IsEnabled="False" Padding="12,8" Background="#D9141D2B" />
+        </StackPanel>
         <Border VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="16" Padding="10,7" Background="#BB101827" CornerRadius="9">
           <TextBlock x:Name="PreviewLabel" Text="VISTA PREVIA" FontSize="10" FontWeight="Bold" Foreground="#D8E4F2" />
         </Border>
