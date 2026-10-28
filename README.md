@@ -11,7 +11,7 @@ App WPF para Windows 10/11. Mantiene la proporción original al adaptar fondos:
 
 1. Instala Visual Studio 2022 con la carga de trabajo **Desarrollo de escritorio de .NET** y el SDK de .NET 8.
 2. Abre `src/FondoClaro.csproj` y restaura el paquete NuGet `Microsoft.Web.WebView2`.
-3. Ejecuta con F5. Para crear el paquete, ejecuta `..\publicar-win-x64.ps1` desde PowerShell. También hay un flujo de GitHub Actions que compila y publica un artefacto al subir cambios a `main`.
+3. Ejecuta con F5. Para crear el paquete, ejecuta `./publicar-win-x64.ps1` desde PowerShell en la carpeta del proyecto. También hay un flujo de GitHub Actions que compila y publica un artefacto al subir cambios a `main`.
 4. Instala Evergreen WebView2 Runtime en el equipo si no está presente. El runtime permite renderizar HTML y medios compatibles.
 
 ## Qué no incluye todavía
