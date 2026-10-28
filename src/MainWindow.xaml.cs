@@ -313,9 +313,8 @@ public partial class MainWindow : Window
             // Always lower/hide the full-screen host even if Windows rejects a wallpaper refresh.
             _wallpaperHost?.SendBehindApps();
             StatusText.Text = wallpaperWarning is null
-                ? "Apps e iconos visibles; el fondo sigue activo detrás de ellos."
-                : $"Apps visibles. Windows no pudo actualizar el fondo: {wallpaperWarning}";
-            WindowState = WindowState.Minimized;
+                ? "Fondo HTML enviado detrás. El panel sigue abierto; las apps y los iconos quedan por encima."
+                : $"Fondo enviado detrás. Windows no pudo actualizar el fondo estático: {wallpaperWarning}";
         }
         catch (Exception ex)
         {
@@ -338,7 +337,7 @@ public partial class MainWindow : Window
             return;
         }
         _wallpaperHost.BringAboveApps();
-        WindowState = WindowState.Minimized;
+        StatusText.Text = "Fondo a pantalla completa. Pulsa Ctrl + Alt + F11 o el botón del fondo para volver.";
     }
 
     private void FitScreen_Click(object sender, RoutedEventArgs e)
