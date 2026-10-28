@@ -1,6 +1,10 @@
 using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 
 namespace FondoClaro;
 
@@ -16,15 +20,24 @@ public partial class WallpaperHostWindow : Window
     private const uint SwpShowWindow = 0x0040;
 
     private readonly string _path;
+    private readonly DispatcherTimer _taskbarButtonTimer;
     private IntPtr _desktopParent;
+    private bool _isHtmlContent;
+    private bool _isFrontMode;
 
     public event Action? TaskbarShown;
+    public bool IsHtmlContent => _isHtmlContent;
 
-    public WallpaperHostWindow(string path)
+    public WallpaperHostWindow(string path, bool htmlContent = true)
     {
         _path = path;
+        _isHtmlContent = htmlContent;
         InitializeComponent();
         Opacity = 0;
+        Browser.Visibility = htmlContent ? Visibility.Visible : Visibility.Collapsed;
+        WallpaperImage.Visibility = htmlContent ? Visibility.Collapsed : Visibility.Visible;
+        _taskbarButtonTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+        _taskbarButtonTimer.Tick += (_, _) => HideTaskbarButton();
         Loaded += OnLoaded;
     }
 
@@ -32,8 +45,24 @@ public partial class WallpaperHostWindow : Window
     {
         try
         {
+            if (!_isHtmlContent)
+            {
+                WallpaperImage.Source = LoadImage(_path);
+                SendBehindApps();
+                Opacity = 1;
+                return;
+            }
+
             var environment = await WebViewEnvironmentProvider.GetAsync();
             await Browser.EnsureCoreWebView2Async(environment);
+            if (!_isHtmlContent)
+            {
+                Browser.Visibility = Visibility.Collapsed;
+                Browser.CoreWebView2?.Navigate("about:blank");
+                SendBehindApps();
+                Opacity = 1;
+                return;
+            }
             Browser.CoreWebView2.WebMessageReceived += (_, args) =>
             {
                 if (args.TryGetWebMessageAsString() == "fc:taskbar")
@@ -80,8 +109,9 @@ public partial class WallpaperHostWindow : Window
                 """);
             Browser.NavigationCompleted += async (_, _) => await SetPausedAsync(false);
 
-            // Create the WebView controller with the normal top-level host HWND.
-            // Only reparent the host into WorkerW after controller initialization.
+            // Initialize WebView2 while the host still has a normal top-level HWND.
+            // Reparenting it to WorkerW before controller creation can make
+            // CreateCoreWebView2Controller fail with ERROR_INVALID_STATE on some PCs.
             SendBehindApps();
             Browser.Source = new Uri(_path);
             Opacity = 1;
@@ -99,7 +129,7 @@ public partial class WallpaperHostWindow : Window
 
     public async Task SetPausedAsync(bool paused)
     {
-        if (Browser.CoreWebView2 is null) return;
+        if (!_isHtmlContent || Browser.CoreWebView2 is null) return;
         var css = paused ? "*{animation-play-state:paused!important;transition-duration:0s!important;scroll-behavior:auto!important}" : "";
         var script = "(()=>{let s=document.getElementById('__fondoclaro_pause');if(s)s.remove();" +
                      (paused ? "s=document.createElement('style');s.id='__fondoclaro_pause';s.textContent=" + System.Text.Json.JsonSerializer.Serialize(css) + ";document.head.appendChild(s);" : "") +
@@ -110,6 +140,8 @@ public partial class WallpaperHostWindow : Window
 
     public void SendBehindApps()
     {
+        _isFrontMode = false;
+        HideTaskbarButton();
         var hwnd = new WindowInteropHelper(this).Handle;
         WindowState = WindowState.Normal;
         Topmost = false;
@@ -121,6 +153,8 @@ public partial class WallpaperHostWindow : Window
 
     public void BringAboveApps()
     {
+        _isFrontMode = true;
+        HideTaskbarButton();
         var hwnd = new WindowInteropHelper(this).Handle;
         WindowState = WindowState.Normal;
         SetParent(hwnd, IntPtr.Zero);
@@ -128,6 +162,71 @@ public partial class WallpaperHostWindow : Window
         Topmost = true;
         PositionAcrossDesktop(hwnd, IntPtr.Zero, new IntPtr(-1), activate: true);
         SetForegroundWindow(hwnd);
+    }
+
+    public void ShowImage(string path)
+    {
+        _isHtmlContent = false;
+        Browser.Visibility = Visibility.Collapsed;
+        if (Browser.CoreWebView2 is not null)
+        {
+            try { Browser.CoreWebView2.Navigate("about:blank"); } catch { }
+        }
+        WallpaperImage.Source = LoadImage(path);
+        WallpaperImage.Visibility = Visibility.Visible;
+        HideTaskbarButton();
+        if (IsLoaded && Opacity == 0)
+        {
+            SendBehindApps();
+            Opacity = 1;
+        }
+    }
+
+    private void OnHostMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (!_isHtmlContent && _isFrontMode) ShowTaskbarButton();
+    }
+
+    private void OnHostMouseMove(object sender, MouseEventArgs e)
+    {
+        if (!_isHtmlContent && _isFrontMode && TaskbarButton.Visibility == Visibility.Visible)
+            ShowTaskbarButton();
+    }
+
+    private void TaskbarButton_Click(object sender, RoutedEventArgs e)
+    {
+        SendBehindApps();
+        TaskbarShown?.Invoke();
+    }
+
+    private void ShowTaskbarButton()
+    {
+        TaskbarButton.Visibility = Visibility.Visible;
+        _taskbarButtonTimer.Stop();
+        _taskbarButtonTimer.Start();
+    }
+
+    private void HideTaskbarButton()
+    {
+        _taskbarButtonTimer.Stop();
+        if (TaskbarButton is not null) TaskbarButton.Visibility = Visibility.Collapsed;
+    }
+
+    private static BitmapImage LoadImage(string path)
+    {
+        var image = new BitmapImage();
+        image.BeginInit();
+        image.CacheOption = BitmapCacheOption.OnLoad;
+        image.UriSource = new Uri(path);
+        image.EndInit();
+        image.Freeze();
+        return image;
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        _taskbarButtonTimer.Stop();
+        base.OnClosed(e);
     }
 
     private static IntPtr FindDesktopParent()
