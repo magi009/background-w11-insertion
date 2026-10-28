@@ -7,7 +7,7 @@ internal sealed class WallpaperHostWindow : Window
     public WallpaperHostWindow(string path)
     {
         Title = "FondoClaro Linux";
-        SystemDecorations = SystemDecorations.None;
+        WindowDecorations = Avalonia.Controls.WindowDecorations.None;
         CanResize = false;
         ShowInTaskbar = false;
         WindowStartupLocation = WindowStartupLocation.Manual;
