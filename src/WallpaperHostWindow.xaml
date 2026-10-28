@@ -4,7 +4,15 @@
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         WindowStyle="None" ResizeMode="NoResize" ShowInTaskbar="False" Topmost="False"
         WindowState="Maximized" Background="Black">
-  <Grid>
+  <Grid x:Name="HostRoot" Background="Black"
+        MouseLeftButtonDown="OnHostMouseLeftButtonDown"
+        MouseMove="OnHostMouseMove">
+    <Image x:Name="WallpaperImage" Stretch="Fill" Visibility="Collapsed" />
     <wv2:WebView2 x:Name="Browser" />
+    <Button x:Name="TaskbarButton" Content="Mostrar barra de tareas"
+            HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,24"
+            Padding="20,12" Background="#EE111827" Foreground="White"
+            BorderBrush="#33C7A5" BorderThickness="1" FontSize="14" FontWeight="SemiBold"
+            Visibility="Collapsed" Click="TaskbarButton_Click" />
   </Grid>
 </Window>
