@@ -21,6 +21,7 @@ public partial class WallpaperHostWindow : Window
     private const uint SwpNoMove = 0x0002;
     private const uint SwpNoSize = 0x0001;
     private static readonly IntPtr HwndNotTopmost = new(-2);
+    private static readonly IntPtr HwndBottom = new(-2);
 
     private readonly string _path;
     private readonly DispatcherTimer _taskbarButtonTimer;
@@ -160,7 +161,14 @@ public partial class WallpaperHostWindow : Window
         _desktopParent = FindDesktopParent();
         SetParent(hwnd, _desktopParent);
         SetWindowLong(hwnd, -16, WsChild | WsVisible | WsClipSiblings | WsClipChildren);
-        PositionAcrossDesktop(hwnd, _desktopParent, IntPtr.Zero, activate: false);
+        PositionAcrossDesktop(hwnd, _desktopParent, HwndBottom, activate: false);
+    }
+
+    public void FitToScreen()
+    {
+        if (!IsLoaded) return;
+        if (_isFrontMode) BringAboveApps();
+        else SendBehindApps();
     }
 
     public void BringAboveApps()
@@ -249,16 +257,25 @@ public partial class WallpaperHostWindow : Window
     {
         var progman = FindWindow("Progman", null);
         if (progman == IntPtr.Zero) throw new InvalidOperationException("Windows no encontró el escritorio.");
-        SendMessageTimeout(progman, 0x052C, IntPtr.Zero, IntPtr.Zero, 0, 1000, out _);
 
-        var worker = IntPtr.Zero;
+        // Parent the HTML host to the shell desktop and put it at the bottom
+        // of that parent's child z-order. This keeps SHELLDLL_DefView icons above it.
+        SendMessageTimeout(progman, 0x052C, IntPtr.Zero, IntPtr.Zero, 0, 1000, out _);
+        var shellView = FindWindowEx(progman, IntPtr.Zero, "SHELLDLL_DefView", null);
+        if (shellView != IntPtr.Zero) return progman;
+
+        var desktopParent = IntPtr.Zero;
         EnumWindows((top, _) =>
         {
             if (FindWindowEx(top, IntPtr.Zero, "SHELLDLL_DefView", null) != IntPtr.Zero)
-                worker = FindWindowEx(IntPtr.Zero, top, "WorkerW", null);
+            {
+                desktopParent = top;
+                return false;
+            }
             return true;
         }, IntPtr.Zero);
-        return worker == IntPtr.Zero ? progman : worker;
+        if (desktopParent != IntPtr.Zero) return desktopParent;
+        throw new InvalidOperationException("Windows no encontró la capa de iconos del escritorio.");
     }
 
     private static void PositionAcrossDesktop(IntPtr hwnd, IntPtr parent, IntPtr insertAfter, bool activate)
