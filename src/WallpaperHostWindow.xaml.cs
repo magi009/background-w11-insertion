@@ -142,6 +142,12 @@ public partial class WallpaperHostWindow : Window
     {
         _isFrontMode = false;
         HideTaskbarButton();
+        if (!_isHtmlContent)
+        {
+            Topmost = false;
+            Hide();
+            return;
+        }
         var hwnd = new WindowInteropHelper(this).Handle;
         WindowState = WindowState.Normal;
         Topmost = false;
@@ -155,6 +161,7 @@ public partial class WallpaperHostWindow : Window
     {
         _isFrontMode = true;
         HideTaskbarButton();
+        if (!_isHtmlContent && !IsVisible) Show();
         var hwnd = new WindowInteropHelper(this).Handle;
         WindowState = WindowState.Normal;
         SetParent(hwnd, IntPtr.Zero);
@@ -166,6 +173,7 @@ public partial class WallpaperHostWindow : Window
 
     public void ShowImage(string path)
     {
+        var keepInFront = _isFrontMode;
         _isHtmlContent = false;
         Browser.Visibility = Visibility.Collapsed;
         if (Browser.CoreWebView2 is not null)
@@ -175,9 +183,11 @@ public partial class WallpaperHostWindow : Window
         WallpaperImage.Source = LoadImage(path);
         WallpaperImage.Visibility = Visibility.Visible;
         HideTaskbarButton();
+        if (!keepInFront && IsVisible) Hide();
         if (IsLoaded && Opacity == 0)
         {
-            SendBehindApps();
+            if (keepInFront) Opacity = 1;
+            else SendBehindApps();
             Opacity = 1;
         }
     }
