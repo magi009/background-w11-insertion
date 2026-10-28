@@ -18,6 +18,9 @@ public partial class WallpaperHostWindow : Window
     private const uint SwpNoActivate = 0x0010;
     private const uint SwpFrameChanged = 0x0020;
     private const uint SwpShowWindow = 0x0040;
+    private const uint SwpNoMove = 0x0002;
+    private const uint SwpNoSize = 0x0001;
+    private static readonly IntPtr HwndNotTopmost = new(-2);
 
     private readonly string _path;
     private readonly DispatcherTimer _taskbarButtonTimer;
@@ -145,12 +148,15 @@ public partial class WallpaperHostWindow : Window
         if (!_isHtmlContent)
         {
             Topmost = false;
+            var imageHwnd = new WindowInteropHelper(this).Handle;
+            SetWindowPos(imageHwnd, HwndNotTopmost, 0, 0, 0, 0, SwpNoMove | SwpNoSize | SwpNoActivate);
             Hide();
             return;
         }
         var hwnd = new WindowInteropHelper(this).Handle;
         WindowState = WindowState.Normal;
         Topmost = false;
+        SetWindowPos(hwnd, HwndNotTopmost, 0, 0, 0, 0, SwpNoMove | SwpNoSize | SwpNoActivate);
         _desktopParent = FindDesktopParent();
         SetParent(hwnd, _desktopParent);
         SetWindowLong(hwnd, -16, WsChild | WsVisible | WsClipSiblings | WsClipChildren);
@@ -257,7 +263,7 @@ public partial class WallpaperHostWindow : Window
 
     private static void PositionAcrossDesktop(IntPtr hwnd, IntPtr parent, IntPtr insertAfter, bool activate)
     {
-        var bounds = System.Windows.Forms.SystemInformation.VirtualScreen;
+        var bounds = GetVirtualDesktopBounds();
         var x = bounds.Left;
         var y = bounds.Top;
         if (parent != IntPtr.Zero)
@@ -274,6 +280,17 @@ public partial class WallpaperHostWindow : Window
         if (!activate) flags |= SwpNoActivate;
         if (!SetWindowPos(hwnd, insertAfter, x, y, bounds.Width, bounds.Height, flags))
             throw new InvalidOperationException($"Windows no pudo cambiar la capa del fondo. Error {Marshal.GetLastWin32Error()}.");
+    }
+
+    private static System.Drawing.Rectangle GetVirtualDesktopBounds()
+    {
+        var x = GetSystemMetrics(76);
+        var y = GetSystemMetrics(77);
+        var width = GetSystemMetrics(78);
+        var height = GetSystemMetrics(79);
+        return width > 0 && height > 0
+            ? new System.Drawing.Rectangle(x, y, width, height)
+            : System.Windows.Forms.SystemInformation.VirtualScreen;
     }
 
     private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
@@ -297,6 +314,7 @@ public partial class WallpaperHostWindow : Window
         if (IntPtr.Size == 8) SetWindowLongPtr64(hWnd, index, new IntPtr(value));
         else SetWindowLong32(hWnd, index, value);
     }
+    [DllImport("user32.dll")] private static extern int GetSystemMetrics(int index);
     [DllImport("user32.dll", SetLastError = true)] private static extern bool SetWindowPos(IntPtr hWnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
     [DllImport("user32.dll", SetLastError = true)] private static extern bool SetForegroundWindow(IntPtr hwnd);
     [DllImport("user32.dll", SetLastError = true)] private static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam, uint flags, uint timeout, out IntPtr result);
