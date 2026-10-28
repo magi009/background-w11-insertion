@@ -24,8 +24,8 @@ public partial class WallpaperHostWindow : Window
     {
         _path = path;
         InitializeComponent();
+        Opacity = 0;
         Loaded += OnLoaded;
-        SourceInitialized += AttachBehindIcons;
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
@@ -79,7 +79,12 @@ public partial class WallpaperHostWindow : Window
                 })();
                 """);
             Browser.NavigationCompleted += async (_, _) => await SetPausedAsync(false);
+
+            // Create the WebView controller with the normal top-level host HWND.
+            // Only reparent the host into WorkerW after controller initialization.
+            SendBehindApps();
             Browser.Source = new Uri(_path);
+            Opacity = 1;
         }
         catch (Exception ex)
         {
@@ -124,8 +129,6 @@ public partial class WallpaperHostWindow : Window
         PositionAcrossDesktop(hwnd, IntPtr.Zero, new IntPtr(-1), activate: true);
         SetForegroundWindow(hwnd);
     }
-
-    private void AttachBehindIcons(object? sender, EventArgs e) => SendBehindApps();
 
     private static IntPtr FindDesktopParent()
     {
