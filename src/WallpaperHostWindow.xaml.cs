@@ -7,13 +7,29 @@ namespace FondoClaro;
 public partial class WallpaperHostWindow : Window
 {
     private readonly string _path;
-    public WallpaperHostWindow(string path) { _path = path; InitializeComponent(); Loaded += OnLoaded; SourceInitialized += AttachBehindIcons; }
+    private IntPtr _desktopParent;
+
+    public WallpaperHostWindow(string path)
+    {
+        _path = path;
+        InitializeComponent();
+        Loaded += OnLoaded;
+        SourceInitialized += AttachBehindIcons;
+    }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
-        await Browser.EnsureCoreWebView2Async();
-        Browser.NavigationCompleted += async (_, _) => await SetPausedAsync(false);
-        Browser.Source = new Uri(_path);
+        try
+        {
+            await Browser.EnsureCoreWebView2Async();
+            Browser.NavigationCompleted += async (_, _) => await SetPausedAsync(false);
+            Browser.Source = new Uri(_path);
+        }
+        catch (Exception ex)
+        {
+            System.Windows.MessageBox.Show($"No se pudo iniciar el fondo HTML. Verifica WebView2 Runtime.\n\n{ex.Message}", "FondoClaro", MessageBoxButton.OK, MessageBoxImage.Error);
+            Close();
+        }
     }
 
     public async Task SetPausedAsync(bool paused)
@@ -27,26 +43,56 @@ public partial class WallpaperHostWindow : Window
         await Browser.CoreWebView2.ExecuteScriptAsync(script);
     }
 
+    public void SendBehindApps()
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        WindowState = WindowState.Normal;
+        Topmost = false;
+        if (_desktopParent == IntPtr.Zero) _desktopParent = FindDesktopParent();
+        SetWindowLong(hwnd, -16, 0x52000000); // WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN
+        SetParent(hwnd, _desktopParent);
+        PositionAcrossDesktop(hwnd, IntPtr.Zero);
+    }
+
+    public void BringAboveApps()
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        SetParent(hwnd, IntPtr.Zero);
+        SetWindowLong(hwnd, -16, unchecked((int)0x90000000)); // WS_POPUP | WS_VISIBLE
+        PositionAcrossDesktop(hwnd, new IntPtr(-1)); // HWND_TOPMOST
+        Topmost = true;
+    }
+
     private void AttachBehindIcons(object? sender, EventArgs e)
     {
         var hwnd = new WindowInteropHelper(this).Handle;
         WindowState = WindowState.Normal;
+        _desktopParent = FindDesktopParent();
+        SetWindowLong(hwnd, -16, 0x52000000); // WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN
+        SetParent(hwnd, _desktopParent);
+        PositionAcrossDesktop(hwnd, IntPtr.Zero);
+    }
+
+    private static IntPtr FindDesktopParent()
+    {
         var progman = FindWindow("Progman", null);
-        if (progman == IntPtr.Zero) throw new InvalidOperationException("Windows no encontró el escritorio para colocar el fondo HTML.");
+        if (progman == IntPtr.Zero) throw new InvalidOperationException("Windows no encontró el escritorio.");
         SendMessageTimeout(progman, 0x052C, IntPtr.Zero, IntPtr.Zero, 0, 1000, out _);
-        IntPtr worker = IntPtr.Zero;
+        var worker = IntPtr.Zero;
         EnumWindows((top, _) =>
         {
-            var shellView = FindWindowEx(top, IntPtr.Zero, "SHELLDLL_DefView", null);
-            if (shellView != IntPtr.Zero) worker = FindWindowEx(IntPtr.Zero, top, "WorkerW", null);
+            if (FindWindowEx(top, IntPtr.Zero, "SHELLDLL_DefView", null) != IntPtr.Zero)
+                worker = FindWindowEx(IntPtr.Zero, top, "WorkerW", null);
             return true;
         }, IntPtr.Zero);
-        if (worker == IntPtr.Zero) worker = progman;
-        SetWindowLong(hwnd, -16, 0x52000000); // WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN
-        SetParent(hwnd, worker);
+        return worker == IntPtr.Zero ? progman : worker;
+    }
+
+    private static void PositionAcrossDesktop(IntPtr hwnd, IntPtr insertAfter)
+    {
         var bounds = System.Windows.Forms.SystemInformation.VirtualScreen;
-        if (!SetWindowPos(hwnd, IntPtr.Zero, bounds.Left, bounds.Top, bounds.Width, bounds.Height, 0x0040 | 0x0010 | 0x0020))
-            throw new InvalidOperationException($"Windows no pudo colocar el fondo HTML. Error {Marshal.GetLastWin32Error()}.");
+        if (!SetWindowPos(hwnd, insertAfter, bounds.Left, bounds.Top, bounds.Width, bounds.Height, 0x0040 | 0x0010 | 0x0020))
+            throw new InvalidOperationException($"Windows no pudo cambiar la capa del fondo. Error {Marshal.GetLastWin32Error()}.");
     }
 
     private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
