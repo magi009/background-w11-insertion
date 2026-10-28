@@ -1,0 +1,27 @@
+# FondoClaro (prototipo Windows)
+
+App WPF para Windows 10/11. Mantiene la proporción original al adaptar fondos:
+
+- **Ajustar:** conserva toda la imagen y rellena el espacio con una versión ampliada y suavizada.
+- **Rellenar:** ocupa la pantalla y recorta los bordes sobrantes, sin deformar.
+- **Archivo de fondo:** prueba el decodificador de imágenes integrado de Windows; si no puede cargar el formato, lo intenta mostrar con WebView2. Puede funcionar con imágenes que Windows decodifique, además de páginas HTML, SVG, PDF, GIF, y medios de audio/video que Edge/WebView2 pueda renderizar.
+- **HTML y medios:** muestra el contenido en WebView2 detrás de los iconos del escritorio mientras la app esté abierta. El botón de pausa controla animaciones CSS y etiquetas de video/audio.
+
+## Compilar en Windows
+
+1. Instala Visual Studio 2022 con la carga de trabajo **Desarrollo de escritorio de .NET** y el SDK de .NET 8.
+2. Abre `src/FondoClaro.csproj` y restaura el paquete NuGet `Microsoft.Web.WebView2`.
+3. Ejecuta con F5. Para crear el paquete, ejecuta `..\publicar-win-x64.ps1` desde PowerShell. También hay un flujo de GitHub Actions que compila y publica un artefacto al subir cambios a `main`.
+4. Instala Evergreen WebView2 Runtime en el equipo si no está presente. El runtime permite renderizar HTML y medios compatibles.
+
+## Qué no incluye todavía
+
+- La app aplica imágenes al monitor principal. HTML y medios se extienden al área virtual de monitores conectados.
+- La frase “cualquier archivo” está limitada a formatos que el decodificador de Windows o WebView2 puedan leer. RAW de cámara, PSD y formatos propietarios pueden requerir códecs o aplicaciones adicionales.
+- La mejora por IA todavía no está incluida. El ajuste de tamaño no necesita IA; una mejora real por IA requiere un modelo local y usa CPU/GPU/RAM mientras trabaja, por lo que no puede ofrecer consumo literalmente cero. Esta versión no procesa nada en segundo plano.
+- El fondo HTML puede usar CPU/GPU mientras sus animaciones están encendidas. El botón **Pausar HTML** detiene las animaciones y transiciones CSS; una página que use bucles JavaScript podría seguir ejecutándolos.
+- HTML puede contener scripts y recursos externos. Carga solamente archivos y páginas en los que confíes.
+
+## Nota técnica
+
+El HTML se renderiza con WebView2; la app necesita el runtime de Microsoft Edge WebView2. La imagen se adapta y guarda en `%LocalAppData%\FondoClaro\fondo-adaptado.png`, y luego Windows la establece como fondo.
