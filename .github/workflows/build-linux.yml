@@ -1,0 +1,36 @@
+name: Build Linux app
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'linux/**'
+      - '.github/workflows/build-linux.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Install .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Restore
+        run: dotnet restore linux/FondoClaro.Linux.csproj
+      - name: Publish Linux x64 app
+        run: dotnet publish linux/FondoClaro.Linux.csproj -c Release -r linux-x64 --self-contained true -o publish/linux-x64
+      - name: Package Linux app
+        run: tar -czf FondoClaro-linux-x64.tar.gz -C publish/linux-x64 .
+      - name: Upload Linux package
+        uses: actions/upload-artifact@v4
+        with:
+          name: FondoClaro-linux-x64
+          path: FondoClaro-linux-x64.tar.gz
+          if-no-files-found: error
+          retention-days: 30

@@ -1,4 +1,4 @@
-# FondoClaro (prototipo Windows)
+# FondoClaro
 
 App WPF para Windows 10/11. Mantiene la proporción original al adaptar fondos:
 
@@ -29,3 +29,7 @@ App WPF para Windows 10/11. Mantiene la proporción original al adaptar fondos:
 ## Nota técnica
 
 HTML y formatos multimedia se renderizan con WebView2; la app necesita el runtime de Microsoft Edge WebView2. La imagen se adapta y guarda en `%LocalAppData%\FondoClaro\fondo-adaptado.jpg`, y luego Windows la establece como fondo.
+
+## Linux
+
+Hay un proyecto complementario en `linux/` basado en Avalonia. Aplica imágenes en GNOME, KDE Plasma, Cinnamon, MATE y XFCE. El fondo HTML debajo de iconos se ofrece en X11; Wayland no permite que una app común coloque ventanas arbitrariamente detrás de los iconos. Consulta `linux/README.md` para paquetes y comandos de compilación.
