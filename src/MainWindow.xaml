@@ -34,7 +34,7 @@
         <Image x:Name="PreviewBackground" Stretch="UniformToFill" Opacity="0.75" />
         <Border Background="#050817" Opacity="0.14" />
         <Image x:Name="PreviewImage" Stretch="Uniform" Margin="28" />
-        <WebView2 x:Name="PreviewWeb" Visibility="Collapsed" />
+        <wv2:WebView2 x:Name="PreviewWeb" Visibility="Collapsed" />
         <Border VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="16" Padding="10,7" Background="#BB101827" CornerRadius="9">
           <TextBlock x:Name="PreviewLabel" Text="VISTA PREVIA" FontSize="10" FontWeight="Bold" Foreground="#D8E4F2" />
         </Border>
