@@ -1,5 +1,6 @@
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
@@ -19,6 +20,9 @@ public partial class MainWindow : Window
     private const uint VkF11 = 0x7A;
     private string? _imagePath;
     private string? _dynamicPath;
+    private string? _originalWallpaperPath;
+    private readonly List<(string MonitorId, string Path)> _originalMonitorWallpapers = new();
+    private bool _capturedOriginalWallpaper;
     private WallpaperHostWindow? _wallpaperHost;
     private DispatcherTimer? _transitionTimer;
     private readonly List<string> _transitionFiles = new();
@@ -156,6 +160,7 @@ public partial class MainWindow : Window
 
     private void ApplyStaticImage(string path)
     {
+        RememberOriginalWallpaper();
         _dynamicPath = null; _imagePath = path;
         var source = LoadImage(path);
         var bounds = System.Windows.Forms.SystemInformation.VirtualScreen;
@@ -169,6 +174,7 @@ public partial class MainWindow : Window
             var encoder = new JpegBitmapEncoder { QualityLevel = 94 };
             encoder.Frames.Add(BitmapFrame.Create(wallpaper)); encoder.Save(stream);
         }
+        ApplyWindowsWallpaper(target);
         if (_wallpaperHost is null || !_wallpaperHost.IsVisible)
         {
             _wallpaperHost?.Close();
@@ -182,7 +188,7 @@ public partial class MainWindow : Window
         }
         SetDynamicButtons(true, canPause: false);
         RemoveBackgroundButton.IsEnabled = true;
-        StatusText.Text = $"Fondo aplicado a {width} × {height}; puedes cambiarlo de capa con los botones.";
+        StatusText.Text = $"Fondo ajustado a {width} × {height} con suavizado y nitidez automática.";
     }
 
     private void StartTransition_Click(object sender, RoutedEventArgs e)
@@ -288,10 +294,18 @@ public partial class MainWindow : Window
         _transitionTimer?.Stop(); _transitionTimer = null;
         _wallpaperHost?.Close(); _wallpaperHost = null;
         SetDynamicButtons(false);
-        _imagePath = null; _dynamicPath = null;
-        RemoveBackgroundButton.IsEnabled = false;
-        RemoveTransition_Click(this, new RoutedEventArgs());
-        StatusText.Text = "Fondo eliminado. Se muestra de nuevo el fondo que Windows tenía antes.";
+        try
+        {
+            if (_capturedOriginalWallpaper) RestoreOriginalWallpaper();
+            _capturedOriginalWallpaper = false;
+            _originalWallpaperPath = null;
+            _originalMonitorWallpapers.Clear();
+            _imagePath = null; _dynamicPath = null;
+            RemoveBackgroundButton.IsEnabled = false;
+            RemoveTransition_Click(this, new RoutedEventArgs());
+            StatusText.Text = "Fondo eliminado; se restauró el fondo de Windows que estaba antes.";
+        }
+        catch (Exception ex) { StatusText.Text = $"No se pudo restaurar el fondo anterior: {ex.Message}"; }
     }
 
     private void ToggleHtml_Click(object sender, RoutedEventArgs e)
@@ -331,12 +345,158 @@ public partial class MainWindow : Window
         var canvas = new System.Windows.Controls.Grid { Width = width, Height = height, Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(8, 14, 24)) };
         if (!fill)
         {
-            canvas.Children.Add(new System.Windows.Controls.Image { Source = source, Stretch = Stretch.UniformToFill, Opacity = .72, Effect = new BlurEffect { Radius = 32, KernelType = KernelType.Gaussian } });
+            var background = new System.Windows.Controls.Image { Source = source, Stretch = Stretch.UniformToFill, Opacity = .72, Effect = new BlurEffect { Radius = 32, KernelType = KernelType.Gaussian } };
+            RenderOptions.SetBitmapScalingMode(background, BitmapScalingMode.HighQuality);
+            canvas.Children.Add(background);
             canvas.Children.Add(new System.Windows.Shapes.Rectangle { Fill = new SolidColorBrush(System.Windows.Media.Color.FromArgb(64, 5, 8, 23)) });
         }
-        canvas.Children.Add(new System.Windows.Controls.Image { Source = source, Stretch = fill ? Stretch.UniformToFill : Stretch.Uniform, Margin = fill ? new Thickness(0) : new Thickness(width * .04, height * .04, width * .04, height * .04) });
+        var foreground = new System.Windows.Controls.Image { Source = source, Stretch = fill ? Stretch.UniformToFill : Stretch.Uniform, Margin = fill ? new Thickness(0) : new Thickness(width * .04, height * .04, width * .04, height * .04) };
+        RenderOptions.SetBitmapScalingMode(foreground, BitmapScalingMode.HighQuality);
+        canvas.Children.Add(foreground);
         canvas.Measure(new System.Windows.Size(width, height)); canvas.Arrange(new Rect(0, 0, width, height)); canvas.UpdateLayout();
-        var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32); bitmap.Render(canvas); bitmap.Freeze(); return bitmap;
+        var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32); bitmap.Render(canvas); bitmap.Freeze();
+        return ApplyAutomaticSharpening(bitmap);
+    }
+
+    private static BitmapSource ApplyAutomaticSharpening(BitmapSource source)
+    {
+        const double amount = 0.32;
+        var converted = new FormatConvertedBitmap(source, PixelFormats.Pbgra32, null, 0);
+        var width = converted.PixelWidth;
+        var height = converted.PixelHeight;
+        var stride = checked(width * 4);
+        var original = new byte[checked(stride * height)];
+        var sharpened = new byte[original.Length];
+        converted.CopyPixels(original, stride, 0);
+        Buffer.BlockCopy(original, 0, sharpened, 0, original.Length);
+
+        for (var y = 1; y < height - 1; y++)
+        {
+            var row = y * stride;
+            for (var x = 1; x < width - 1; x++)
+            {
+                var i = row + x * 4;
+                for (var channel = 0; channel < 3; channel++)
+                {
+                    var center = original[i + channel];
+                    var blur = (center * 4
+                        + original[i - stride + channel] * 2
+                        + original[i + stride + channel] * 2
+                        + original[i - 4 + channel] * 2
+                        + original[i + 4 + channel] * 2
+                        + original[i - stride - 4 + channel]
+                        + original[i - stride + 4 + channel]
+                        + original[i + stride - 4 + channel]
+                        + original[i + stride + 4 + channel]) / 16.0;
+                    sharpened[i + channel] = (byte)Math.Clamp((int)Math.Round(center + (center - blur) * amount), 0, 255);
+                }
+            }
+        }
+
+        var result = new WriteableBitmap(width, height, converted.DpiX, converted.DpiY, PixelFormats.Pbgra32, null);
+        result.WritePixels(new Int32Rect(0, 0, width, height), sharpened, stride, 0);
+        result.Freeze();
+        return result;
+    }
+
+    private void RememberOriginalWallpaper()
+    {
+        if (_capturedOriginalWallpaper) return;
+        _capturedOriginalWallpaper = true;
+        var current = new StringBuilder(32768);
+        if (SystemParametersInfoGet(0x73, (uint)current.Capacity, current, 0) && current.Length > 0)
+            _originalWallpaperPath = current.ToString();
+
+        object? desktopWallpaper = null;
+        try
+        {
+            var type = Type.GetTypeFromCLSID(new Guid("C2CF3110-460E-4FC1-B9D0-8A1C0C9CC4BD"), throwOnError: true)!;
+            desktopWallpaper = Activator.CreateInstance(type);
+            if (desktopWallpaper is not IDesktopWallpaper desktop) return;
+            desktop.GetMonitorDevicePathCount(out var count);
+            for (uint i = 0; i < count; i++)
+            {
+                IntPtr monitorPtr = IntPtr.Zero;
+                IntPtr pathPtr = IntPtr.Zero;
+                try
+                {
+                    desktop.GetMonitorDevicePathAt(i, out monitorPtr);
+                    var monitorId = Marshal.PtrToStringUni(monitorPtr);
+                    if (string.IsNullOrWhiteSpace(monitorId)) continue;
+                    desktop.GetWallpaper(monitorId, out pathPtr);
+                    var path = Marshal.PtrToStringUni(pathPtr);
+                    _originalMonitorWallpapers.Add((monitorId, path ?? string.Empty));
+                }
+                finally
+                {
+                    if (monitorPtr != IntPtr.Zero) Marshal.FreeCoTaskMem(monitorPtr);
+                    if (pathPtr != IntPtr.Zero) Marshal.FreeCoTaskMem(pathPtr);
+                }
+            }
+        }
+        catch { }
+        finally
+        {
+            if (desktopWallpaper is not null && Marshal.IsComObject(desktopWallpaper)) Marshal.FinalReleaseComObject(desktopWallpaper);
+        }
+    }
+
+    private void RestoreOriginalWallpaper()
+    {
+        if (_originalMonitorWallpapers.Count > 0)
+        {
+            object? desktopWallpaper = null;
+            try
+            {
+                var type = Type.GetTypeFromCLSID(new Guid("C2CF3110-460E-4FC1-B9D0-8A1C0C9CC4BD"), throwOnError: true)!;
+                desktopWallpaper = Activator.CreateInstance(type) ?? throw new InvalidOperationException("Windows no creó el servicio de fondos.");
+                var desktop = (IDesktopWallpaper)desktopWallpaper;
+                foreach (var item in _originalMonitorWallpapers) desktop.SetWallpaper(item.MonitorId, item.Path);
+                return;
+            }
+            finally
+            {
+                if (desktopWallpaper is not null && Marshal.IsComObject(desktopWallpaper)) Marshal.FinalReleaseComObject(desktopWallpaper);
+            }
+        }
+        if (!string.IsNullOrWhiteSpace(_originalWallpaperPath) && File.Exists(_originalWallpaperPath))
+        {
+            ApplyWindowsWallpaper(_originalWallpaperPath);
+            return;
+        }
+        if (!SystemParametersInfo(20, 0, string.Empty, 3))
+            throw new InvalidOperationException($"Windows no pudo restaurar el fondo anterior. Error {Marshal.GetLastWin32Error()}.");
+    }
+
+    private static void ApplyWindowsWallpaper(string path)
+    {
+        Exception? comError = null;
+        object? desktopWallpaper = null;
+        try
+        {
+            var type = Type.GetTypeFromCLSID(new Guid("C2CF3110-460E-4FC1-B9D0-8A1C0C9CC4BD"), throwOnError: true)!;
+            desktopWallpaper = Activator.CreateInstance(type) ?? throw new InvalidOperationException("Windows no creó el servicio de fondos.");
+            ((IDesktopWallpaper)desktopWallpaper).SetWallpaper(null, path);
+            return;
+        }
+        catch (Exception ex) { comError = ex; }
+        finally
+        {
+            if (desktopWallpaper is not null && Marshal.IsComObject(desktopWallpaper)) Marshal.FinalReleaseComObject(desktopWallpaper);
+        }
+        if (!SystemParametersInfo(20, 0, path, 3))
+            throw new InvalidOperationException($"Windows rechazó el fondo. Error del sistema: {Marshal.GetLastWin32Error()}. {comError?.Message}");
+    }
+
+    [ComImport]
+    [Guid("B92B56A9-8B55-4E14-9A89-0199BBB6F93B")]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IDesktopWallpaper
+    {
+        void SetWallpaper([MarshalAs(UnmanagedType.LPWStr)] string? monitorId, [MarshalAs(UnmanagedType.LPWStr)] string wallpaper);
+        void GetWallpaper([MarshalAs(UnmanagedType.LPWStr)] string? monitorId, out IntPtr wallpaper);
+        void GetMonitorDevicePathAt(uint monitorIndex, out IntPtr monitorId);
+        void GetMonitorDevicePathCount(out uint count);
     }
 
     protected override void OnClosed(EventArgs e)
@@ -347,4 +507,8 @@ public partial class MainWindow : Window
 
     [DllImport("user32.dll", SetLastError = true)] private static extern bool RegisterHotKey(IntPtr hwnd, int id, uint modifiers, uint virtualKey);
     [DllImport("user32.dll", SetLastError = true)] private static extern bool UnregisterHotKey(IntPtr hwnd, int id);
+    [DllImport("user32.dll", EntryPoint = "SystemParametersInfoW", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern bool SystemParametersInfo(uint action, uint param, string value, uint flags);
+    [DllImport("user32.dll", EntryPoint = "SystemParametersInfoW", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern bool SystemParametersInfoGet(uint action, uint param, StringBuilder value, uint flags);
 }
