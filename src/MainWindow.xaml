@@ -55,7 +55,8 @@
       <Button x:Name="ApplyButton" Content="Aplicar al escritorio" Click="Apply_Click" Margin="0,18,0,0" Background="#117A68" BorderBrush="#22A88F" FontWeight="SemiBold" />
       <Button x:Name="ToggleHtmlButton" Content="Pausar fondo" Click="ToggleHtml_Click" Margin="0,9,0,0" IsEnabled="False" />
       <Button x:Name="SendBackButton" Content="Enviar detrás de las apps" Click="SendBack_Click" Margin="0,9,0,0" IsEnabled="False" />
-      <Button x:Name="BringFrontButton" Content="Traer delante de las apps" Click="BringFront_Click" Margin="0,9,0,0" IsEnabled="False" />
+      <Button x:Name="BringFrontButton" Content="Traer al frente · cubrir todo" Click="BringFront_Click" Margin="0,9,0,0" IsEnabled="False" />
+      <TextBlock x:Name="HotkeyText" Text="Atajo: Ctrl + Alt + F11" Foreground="{StaticResource Muted}" FontSize="11" TextWrapping="Wrap" Margin="0,7,0,0" />
       <Button x:Name="RemoveBackgroundButton" Content="Eliminar fondo" Click="RemoveBackground_Click" Margin="0,9,0,0" IsEnabled="False" />
       <TextBlock x:Name="StatusText" Text="Ajuste local sin procesos en segundo plano." Foreground="{StaticResource Muted}" FontSize="12" TextWrapping="Wrap" Margin="0,11,0,0" />
       <TextBlock Text="Imágenes: decodificador de Windows. SVG, PDF, HTML y video: WebView2 si puede abrirlos." Foreground="{StaticResource Muted}" FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0" />

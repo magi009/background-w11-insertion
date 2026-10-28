@@ -6,7 +6,8 @@ App WPF para Windows 10/11. Mantiene la proporción original al adaptar fondos:
 - **Rellenar:** ocupa la pantalla y recorta los bordes sobrantes, sin deformar.
 - **Archivo de fondo:** prueba el decodificador de imágenes integrado de Windows; si no puede cargar el formato, lo intenta mostrar con WebView2. Puede funcionar con imágenes que Windows decodifique, además de páginas HTML, SVG, PDF, GIF, y medios de audio/video que Edge/WebView2 pueda renderizar.
 - **HTML y medios:** muestra el contenido en WebView2 detrás de los iconos del escritorio mientras la app esté abierta. El botón de pausa controla animaciones CSS y etiquetas de video/audio.
-- **Capas para HTML:** permite enviar el fondo detrás de las ventanas o mostrarlo delante de ellas. Los botones de capa solo se activan para fondos dinámicos de WebView2.
+- **Capas para HTML:** permite colocar el fondo detrás de las ventanas o al frente cubriendo también la barra de tareas. En el modo al frente, haz clic en la imagen para revelar el botón **Mostrar barra de tareas**; se oculta tras 3 segundos sin movimiento del puntero. Al pulsarlo, el fondo vuelve detrás de las ventanas.
+- **Atajo de teclado:** Ctrl + Alt + F11 trae el fondo HTML al frente desde cualquier app. Si otra aplicación ya registró esa combinación, FondoClaro avisa y el atajo no se apropia de ella.
 - **Eliminar fondo:** restaura la imagen que estaba puesta antes de usar FondoClaro. Si Windows no reportó una imagen anterior, se solicita el fondo vacío del sistema.
 - **Transición de imágenes:** elige dos o más imágenes, cambia entre ellas y mira la cuenta regresiva. El intervalo puede ser manual (segundos, minutos, horas o días) o automático (5 minutos); se puede pausar, reanudar o eliminar la transición conservando el fondo actual.
 
@@ -19,7 +20,7 @@ App WPF para Windows 10/11. Mantiene la proporción original al adaptar fondos:
 
 ## Qué no incluye todavía
 
-- La app aplica imágenes al monitor principal. HTML y medios se extienden al área virtual de monitores conectados. El orden delante/detrás controla la ventana WebView2 mientras la app sigue abierta.
+- La app aplica imágenes al monitor principal. HTML y medios se extienden al área virtual de monitores conectados. El orden delante/detrás controla la ventana WebView2 mientras la app sigue abierta; los cambios de capa convierten las coordenadas de pantalla a las del escritorio anfitrión.
 - La frase “cualquier archivo” está limitada a formatos que el decodificador de Windows o WebView2 puedan leer. RAW de cámara, PSD y formatos propietarios pueden requerir códecs o aplicaciones adicionales.
 - La mejora por IA todavía no está incluida. El ajuste de tamaño no necesita IA; una mejora real por IA requiere un modelo local y usa CPU/GPU/RAM mientras trabaja, por lo que no puede ofrecer consumo literalmente cero. Esta versión no procesa nada en segundo plano.
 - El fondo HTML o multimedia puede usar CPU/GPU mientras está encendido. **Pausar fondo** detiene animaciones CSS y video/audio; una página que use bucles JavaScript podría seguir ejecutándolos.

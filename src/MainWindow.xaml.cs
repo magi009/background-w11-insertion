@@ -6,11 +6,18 @@ using System.Windows.Media;
 using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using System.Windows.Interop;
 
 namespace FondoClaro;
 
 public partial class MainWindow : Window
 {
+    private const int WallpaperHotkeyId = 0x4FC1;
+    private const int WmHotkey = 0x0312;
+    private const uint ModAlt = 0x0001;
+    private const uint ModControl = 0x0002;
+    private const uint ModNoRepeat = 0x4000;
+    private const uint VkF11 = 0x7A;
     private string? _imagePath;
     private string? _dynamicPath;
     private string? _originalWallpaperPath;
@@ -23,8 +30,34 @@ public partial class MainWindow : Window
     private TimeSpan _transitionRemaining;
     private bool _transitionPaused;
     private bool _fill;
+    private bool _hotkeyRegistered;
 
     public MainWindow() => InitializeComponent();
+
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        base.OnSourceInitialized(e);
+        var hwnd = new WindowInteropHelper(this).Handle;
+        HwndSource.FromHwnd(hwnd)?.AddHook(MainWindowProc);
+        _hotkeyRegistered = RegisterHotKey(hwnd, WallpaperHotkeyId, ModControl | ModAlt | ModNoRepeat, VkF11);
+        HotkeyText.Text = _hotkeyRegistered
+            ? "Atajo global: Ctrl + Alt + F11 · traer al frente"
+            : "Ctrl + Alt + F11 está ocupado; usa el botón de arriba.";
+    }
+
+    private IntPtr MainWindowProc(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (message == WmHotkey && wParam.ToInt32() == WallpaperHotkeyId)
+        {
+            if (_wallpaperHost is not null)
+            {
+                _wallpaperHost.BringAboveApps();
+                StatusText.Text = "Fondo traído al frente. Haz clic en la imagen y pulsa «Mostrar barra de tareas» para volver.";
+            }
+            handled = true;
+        }
+        return IntPtr.Zero;
+    }
 
     private async void ChooseImage_Click(object sender, RoutedEventArgs e)
     {
@@ -111,6 +144,7 @@ public partial class MainWindow : Window
                 RememberOriginalWallpaper();
                 _wallpaperHost?.Close();
                 _wallpaperHost = new WallpaperHostWindow(_dynamicPath);
+                _wallpaperHost.TaskbarShown += () => StatusText.Text = "Barra de tareas visible; fondo detrás de las ventanas.";
                 _wallpaperHost.Show();
                 SetDynamicButtons(true);
                 RemoveBackgroundButton.IsEnabled = true;
@@ -236,13 +270,13 @@ public partial class MainWindow : Window
     private void SendBack_Click(object sender, RoutedEventArgs e)
     {
         _wallpaperHost?.SendBehindApps();
-        StatusText.Text = "Fondo colocado detrás de las ventanas.";
+        StatusText.Text = "Fondo detrás de las ventanas y barra de tareas.";
     }
 
     private void BringFront_Click(object sender, RoutedEventArgs e)
     {
         _wallpaperHost?.BringAboveApps();
-        StatusText.Text = "Fondo colocado delante de las ventanas.";
+        StatusText.Text = "Fondo al frente y cubriendo la barra de tareas. Ctrl + Alt + F11 lo trae al frente otra vez.";
     }
 
     private void RemoveBackground_Click(object sender, RoutedEventArgs e)
@@ -347,8 +381,14 @@ public partial class MainWindow : Window
         void SetWallpaper([MarshalAs(UnmanagedType.LPWStr)] string? monitorId, [MarshalAs(UnmanagedType.LPWStr)] string wallpaper);
     }
 
-    protected override void OnClosed(EventArgs e) { _transitionTimer?.Stop(); _wallpaperHost?.Close(); base.OnClosed(e); }
+    protected override void OnClosed(EventArgs e)
+    {
+        if (_hotkeyRegistered) UnregisterHotKey(new WindowInteropHelper(this).Handle, WallpaperHotkeyId);
+        _transitionTimer?.Stop(); _wallpaperHost?.Close(); base.OnClosed(e);
+    }
 
+    [DllImport("user32.dll", SetLastError = true)] private static extern bool RegisterHotKey(IntPtr hwnd, int id, uint modifiers, uint virtualKey);
+    [DllImport("user32.dll", SetLastError = true)] private static extern bool UnregisterHotKey(IntPtr hwnd, int id);
     [DllImport("user32.dll", EntryPoint = "SystemParametersInfoW", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern bool SystemParametersInfo(uint action, uint param, string value, uint flags);
     [DllImport("user32.dll", EntryPoint = "SystemParametersInfoW", CharSet = CharSet.Unicode, SetLastError = true)]
