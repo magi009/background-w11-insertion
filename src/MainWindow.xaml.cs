@@ -88,7 +88,8 @@ public partial class MainWindow : Window
                 _dynamicPath = dialog.FileName; _imagePath = null;
                 PreviewImage.Visibility = Visibility.Collapsed; PreviewBackground.Visibility = Visibility.Collapsed;
                 PreviewWeb.Visibility = Visibility.Visible;
-                await PreviewWeb.EnsureCoreWebView2Async();
+                var environment = await WebViewEnvironmentProvider.GetAsync();
+                await PreviewWeb.EnsureCoreWebView2Async(environment);
                 PreviewWeb.Source = new Uri(dialog.FileName);
                 SetDynamicButtons(false);
                 PreviewLabel.Text = $"VISTA PREVIA · {Path.GetExtension(dialog.FileName).TrimStart('.').ToUpperInvariant()}";

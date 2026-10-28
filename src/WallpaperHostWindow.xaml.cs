@@ -32,7 +32,8 @@ public partial class WallpaperHostWindow : Window
     {
         try
         {
-            await Browser.EnsureCoreWebView2Async();
+            var environment = await WebViewEnvironmentProvider.GetAsync();
+            await Browser.EnsureCoreWebView2Async(environment);
             Browser.CoreWebView2.WebMessageReceived += (_, args) =>
             {
                 if (args.TryGetWebMessageAsString() == "fc:taskbar")
@@ -82,7 +83,11 @@ public partial class WallpaperHostWindow : Window
         }
         catch (Exception ex)
         {
-            System.Windows.MessageBox.Show($"No se pudo iniciar el fondo HTML. Verifica WebView2 Runtime.\n\n{ex.Message}", "FondoClaro", MessageBoxButton.OK, MessageBoxImage.Error);
+            System.Windows.MessageBox.Show(
+                $"WebView2 no pudo iniciar el fondo HTML. Verifica que Microsoft Edge WebView2 Runtime esté instalado.\n\n{ex.Message}\nCódigo: 0x{ex.HResult:X8}",
+                "FondoClaro",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
             Close();
         }
     }
