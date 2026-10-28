@@ -356,7 +356,6 @@ public partial class MainWindow : Window
             {
                 ApplyPreviewMode();
                 ApplyStaticImage(_imagePath);
-                _hasActiveWallpaper = true;
                 PreviewFitButton.IsEnabled = true;
                 PreviewFullscreenButton.IsEnabled = true;
                 return;
