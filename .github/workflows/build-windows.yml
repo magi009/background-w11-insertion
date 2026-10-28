@@ -20,19 +20,17 @@ jobs:
           dotnet-version: 8.0.x
       - name: Restore
         run: dotnet restore src/FondoClaro.csproj
-        working-directory: FondoClaro
       - name: Publish self-contained Windows x64 app
         run: dotnet publish src/FondoClaro.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
-        working-directory: FondoClaro
       - name: Create distributable zip
         shell: pwsh
-        run: Compress-Archive -Path FondoClaro/publish/* -DestinationPath FondoClaro-win-x64.zip -Force
+        run: Compress-Archive -Path publish/* -DestinationPath FondoClaro-win-x64.zip -Force
       - name: Upload executable and package
         uses: actions/upload-artifact@v4
         with:
           name: FondoClaro-win-x64
           path: |
-            FondoClaro/publish/FondoClaro.exe
+            publish/FondoClaro.exe
             FondoClaro-win-x64.zip
           if-no-files-found: error
           retention-days: 30
