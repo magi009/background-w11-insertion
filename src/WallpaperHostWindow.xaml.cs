@@ -182,12 +182,12 @@ public partial class WallpaperHostWindow : Window
         }
     }
 
-    private void OnHostMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    private void OnHostMouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
         if (!_isHtmlContent && _isFrontMode) ShowTaskbarButton();
     }
 
-    private void OnHostMouseMove(object sender, MouseEventArgs e)
+    private void OnHostMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
     {
         if (!_isHtmlContent && _isFrontMode && TaskbarButton.Visibility == Visibility.Visible)
             ShowTaskbarButton();
