@@ -21,7 +21,7 @@ public partial class WallpaperHostWindow : Window
     private const uint SwpNoMove = 0x0002;
     private const uint SwpNoSize = 0x0001;
     private static readonly IntPtr HwndNotTopmost = new(-2);
-    private static readonly IntPtr HwndBottom = new(-2);
+    private static readonly IntPtr HwndBottom = new(1);
 
     private readonly string _path;
     private readonly DispatcherTimer _taskbarButtonTimer;
@@ -159,8 +159,10 @@ public partial class WallpaperHostWindow : Window
         Topmost = false;
         SetWindowPos(hwnd, HwndNotTopmost, 0, 0, 0, 0, SwpNoMove | SwpNoSize | SwpNoActivate);
         _desktopParent = FindDesktopParent();
-        SetParent(hwnd, _desktopParent);
+        // A child HWND must be explicitly placed at HWND_BOTTOM (1) inside the
+        // desktop WorkerW. This keeps it below Explorer's icon view and normal apps.
         SetWindowLong(hwnd, -16, WsChild | WsVisible | WsClipSiblings | WsClipChildren);
+        SetParent(hwnd, _desktopParent);
         PositionAcrossDesktop(hwnd, _desktopParent, HwndBottom, activate: false);
     }
 
@@ -175,11 +177,13 @@ public partial class WallpaperHostWindow : Window
     {
         _isFrontMode = true;
         HideTaskbarButton();
-        if (!_isHtmlContent && !IsVisible) Show();
+        if (!IsVisible) Show();
         var hwnd = new WindowInteropHelper(this).Handle;
         WindowState = WindowState.Normal;
-        SetParent(hwnd, IntPtr.Zero);
+        // Restore the host to a real top-level popup before covering the desktop.
         SetWindowLong(hwnd, -16, WsPopup | WsVisible);
+        SetParent(hwnd, IntPtr.Zero);
+        ShowWindow(hwnd, 9); // SW_RESTORE, in case Explorer/WPF retained an iconic state.
         Topmost = true;
         PositionAcrossDesktop(hwnd, IntPtr.Zero, new IntPtr(-1), activate: true);
         SetForegroundWindow(hwnd);
@@ -347,6 +351,7 @@ public partial class WallpaperHostWindow : Window
     }
     [DllImport("user32.dll")] private static extern int GetSystemMetrics(int index);
     [DllImport("user32.dll", SetLastError = true)] private static extern bool SetWindowPos(IntPtr hWnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
+    [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr hwnd, int command);
     [DllImport("user32.dll", SetLastError = true)] private static extern bool SetForegroundWindow(IntPtr hwnd);
     [DllImport("user32.dll", SetLastError = true)] private static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam, uint flags, uint timeout, out IntPtr result);
 }
