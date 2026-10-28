@@ -20,6 +20,7 @@ public partial class MainWindow : Window
     private const uint VkF11 = 0x7A;
     private string? _imagePath;
     private string? _dynamicPath;
+    private string? _renderedWallpaperPath;
     private string? _originalWallpaperPath;
     private readonly List<(string MonitorId, string Path)> _originalMonitorWallpapers = new();
     private bool _capturedOriginalWallpaper;
@@ -81,8 +82,9 @@ public partial class MainWindow : Window
                 PreviewImage.Visibility = Visibility.Visible;
                 PreviewBackground.Source = source; PreviewImage.Source = source; ApplyPreviewMode();
                 SetDynamicButtons(false);
-                PreviewLabel.Text = $"VISTA PREVIA · {source.PixelWidth} × {source.PixelHeight}";
-                StatusText.Text = "Imagen cargada. Se mantendrá su proporción al aplicarla.";
+                var desktop = GetVirtualDesktopBounds();
+                PreviewLabel.Text = $"ORIGINAL {source.PixelWidth} × {source.PixelHeight}  ·  FONDO FINAL {desktop.Width} × {desktop.Height}";
+                StatusText.Text = "La vista previa conserva la imagen original; al aplicar, se adapta a la resolución física del escritorio y se mejora automáticamente.";
             }
             else
             {
@@ -163,7 +165,7 @@ public partial class MainWindow : Window
         RememberOriginalWallpaper();
         _dynamicPath = null; _imagePath = path;
         var source = LoadImage(path);
-        var bounds = System.Windows.Forms.SystemInformation.VirtualScreen;
+        var bounds = GetVirtualDesktopBounds();
         var width = bounds.Width; var height = bounds.Height;
         var wallpaper = RenderWallpaper(source, width, height, _fill);
         var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FondoClaro");
@@ -174,6 +176,7 @@ public partial class MainWindow : Window
             var encoder = new JpegBitmapEncoder { QualityLevel = 94 };
             encoder.Frames.Add(BitmapFrame.Create(wallpaper)); encoder.Save(stream);
         }
+        _renderedWallpaperPath = target;
         ApplyWindowsWallpaper(target);
         if (_wallpaperHost is null || !_wallpaperHost.IsVisible)
         {
@@ -279,8 +282,17 @@ public partial class MainWindow : Window
 
     private void SendBack_Click(object sender, RoutedEventArgs e)
     {
-        _wallpaperHost?.SendBehindApps();
-        StatusText.Text = "Fondo detrás de las ventanas y barra de tareas.";
+        try
+        {
+            if (_dynamicPath is null && _renderedWallpaperPath is not null && File.Exists(_renderedWallpaperPath))
+                ApplyWindowsWallpaper(_renderedWallpaperPath);
+            _wallpaperHost?.SendBehindApps();
+            StatusText.Text = "Apps e iconos visibles; el fondo adaptado sigue aplicado detrás de ellos.";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"No se pudo mostrar el escritorio: {ex.Message}";
+        }
     }
 
     private void BringFront_Click(object sender, RoutedEventArgs e)
@@ -301,6 +313,7 @@ public partial class MainWindow : Window
             _originalWallpaperPath = null;
             _originalMonitorWallpapers.Clear();
             _imagePath = null; _dynamicPath = null;
+            _renderedWallpaperPath = null;
             RemoveBackgroundButton.IsEnabled = false;
             RemoveTransition_Click(this, new RoutedEventArgs());
             StatusText.Text = "Fondo eliminado; se restauró el fondo de Windows que estaba antes.";
@@ -338,6 +351,17 @@ public partial class MainWindow : Window
         var image = new BitmapImage();
         image.BeginInit(); image.CacheOption = BitmapCacheOption.OnLoad; image.UriSource = new Uri(path); image.EndInit(); image.Freeze();
         return image;
+    }
+
+    private static System.Drawing.Rectangle GetVirtualDesktopBounds()
+    {
+        var x = GetSystemMetrics(76);
+        var y = GetSystemMetrics(77);
+        var width = GetSystemMetrics(78);
+        var height = GetSystemMetrics(79);
+        return width > 0 && height > 0
+            ? new System.Drawing.Rectangle(x, y, width, height)
+            : System.Windows.Forms.SystemInformation.VirtualScreen;
     }
 
     private static BitmapSource RenderWallpaper(ImageSource source, int width, int height, bool fill)
@@ -507,6 +531,7 @@ public partial class MainWindow : Window
 
     [DllImport("user32.dll", SetLastError = true)] private static extern bool RegisterHotKey(IntPtr hwnd, int id, uint modifiers, uint virtualKey);
     [DllImport("user32.dll", SetLastError = true)] private static extern bool UnregisterHotKey(IntPtr hwnd, int id);
+    [DllImport("user32.dll")] private static extern int GetSystemMetrics(int index);
     [DllImport("user32.dll", EntryPoint = "SystemParametersInfoW", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern bool SystemParametersInfo(uint action, uint param, string value, uint flags);
     [DllImport("user32.dll", EntryPoint = "SystemParametersInfoW", CharSet = CharSet.Unicode, SetLastError = true)]
