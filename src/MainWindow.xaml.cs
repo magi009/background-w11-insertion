@@ -33,6 +33,7 @@ public partial class MainWindow : Window
     private bool _transitionPaused;
     private bool _fill;
     private bool _hotkeyRegistered;
+    private bool _hasActiveWallpaper;
 
     public MainWindow() => InitializeComponent();
 
@@ -145,17 +146,28 @@ public partial class MainWindow : Window
         {
             if (_dynamicPath is not null)
             {
+                RememberOriginalWallpaper();
                 _wallpaperHost?.Close();
                 _wallpaperHost = new WallpaperHostWindow(_dynamicPath, htmlContent: true);
-                _wallpaperHost.TaskbarShown += () => StatusText.Text = "Barra de tareas visible; fondo detrás de las ventanas.";
+                _wallpaperHost.TaskbarShown += () =>
+                {
+                    StatusText.Text = "Apps e iconos visibles; el fondo HTML sigue activo.";
+                    WindowState = WindowState.Minimized;
+                };
                 _wallpaperHost.Show();
                 SetDynamicButtons(true, canPause: true);
+                _hasActiveWallpaper = true;
+                PreviewFitButton.IsEnabled = true;
+                PreviewFullscreenButton.IsEnabled = true;
                 RemoveBackgroundButton.IsEnabled = true;
                 StatusText.Text = "Fondo activo detrás de las apps. Usa los botones para cambiar su capa.";
                 return;
             }
             if (_imagePath is null) { StatusText.Text = "Elige primero un archivo de fondo."; return; }
             ApplyStaticImage(_imagePath);
+            _hasActiveWallpaper = true;
+            PreviewFitButton.IsEnabled = true;
+            PreviewFullscreenButton.IsEnabled = true;
         }
         catch (Exception ex) { System.Windows.MessageBox.Show($"No se pudo aplicar el fondo.\n\n{ex.Message}", "FondoClaro", MessageBoxButton.OK, MessageBoxImage.Error); }
     }
@@ -298,8 +310,9 @@ public partial class MainWindow : Window
             // Always lower/hide the full-screen host even if Windows rejects a wallpaper refresh.
             _wallpaperHost?.SendBehindApps();
             StatusText.Text = wallpaperWarning is null
-                ? "Apps e iconos visibles; el fondo adaptado sigue aplicado detrás de ellos."
+                ? "Apps e iconos visibles; el fondo sigue activo detrás de ellos."
                 : $"Apps visibles. Windows no pudo actualizar el fondo: {wallpaperWarning}";
+            WindowState = WindowState.Minimized;
         }
         catch (Exception ex)
         {
@@ -309,8 +322,45 @@ public partial class MainWindow : Window
 
     private void BringFront_Click(object sender, RoutedEventArgs e)
     {
-        _wallpaperHost?.BringAboveApps();
-        StatusText.Text = "Fondo al frente y cubriendo la barra de tareas. Ctrl + Alt + F11 lo trae al frente otra vez.";
+        if (_wallpaperHost is null) return;
+        _wallpaperHost.BringAboveApps();
+        StatusText.Text = "Fondo a pantalla completa. Ctrl + Alt + F11 lo vuelve a traer al frente.";
+    }
+
+    private void PreviewFullscreen_Click(object sender, RoutedEventArgs e)
+    {
+        if (_wallpaperHost is null)
+        {
+            StatusText.Text = "Aplica primero el fondo y luego podrás abrirlo a pantalla completa.";
+            return;
+        }
+        _wallpaperHost.BringAboveApps();
+        WindowState = WindowState.Minimized;
+    }
+
+    private void FitScreen_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (_dynamicPath is not null)
+            {
+                if (_wallpaperHost is null) Apply_Click(sender, e);
+                else _wallpaperHost.FitToScreen();
+                PreviewLabel.Text = $"HTML · AJUSTE AUTOMÁTICO · {GetVirtualDesktopBounds().Width} × {GetVirtualDesktopBounds().Height}";
+                return;
+            }
+            if (_imagePath is not null)
+            {
+                ApplyPreviewMode();
+                ApplyStaticImage(_imagePath);
+                _hasActiveWallpaper = true;
+                PreviewFitButton.IsEnabled = true;
+                PreviewFullscreenButton.IsEnabled = true;
+                return;
+            }
+            StatusText.Text = "Elige primero un archivo de fondo.";
+        }
+        catch (Exception ex) { StatusText.Text = $"No se pudo ajustar a la pantalla: {ex.Message}"; }
     }
 
     private void RemoveBackground_Click(object sender, RoutedEventArgs e)
@@ -326,6 +376,9 @@ public partial class MainWindow : Window
             _originalMonitorWallpapers.Clear();
             _imagePath = null; _dynamicPath = null;
             _renderedWallpaperPath = null;
+            _hasActiveWallpaper = false;
+            PreviewFitButton.IsEnabled = false;
+            PreviewFullscreenButton.IsEnabled = false;
             RemoveBackgroundButton.IsEnabled = false;
             RemoveTransition_Click(this, new RoutedEventArgs());
             StatusText.Text = "Fondo eliminado; se restauró el fondo de Windows que estaba antes.";
