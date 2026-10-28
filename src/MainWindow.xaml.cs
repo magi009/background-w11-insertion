@@ -33,7 +33,6 @@ public partial class MainWindow : Window
     private bool _transitionPaused;
     private bool _fill;
     private bool _hotkeyRegistered;
-    private bool _hasActiveWallpaper;
 
     public MainWindow() => InitializeComponent();
 
@@ -83,6 +82,8 @@ public partial class MainWindow : Window
                 PreviewImage.Visibility = Visibility.Visible;
                 PreviewBackground.Source = source; PreviewImage.Source = source; ApplyPreviewMode();
                 SetDynamicButtons(false);
+                PreviewFitButton.IsEnabled = true;
+                PreviewFullscreenButton.IsEnabled = false;
                 var desktop = GetVirtualDesktopBounds();
                 PreviewLabel.Text = $"ORIGINAL {source.PixelWidth} × {source.PixelHeight}  ·  FONDO FINAL {desktop.Width} × {desktop.Height}";
                 StatusText.Text = "La vista previa conserva la imagen original; al aplicar, se adapta a la resolución física del escritorio y se mejora automáticamente.";
@@ -96,6 +97,8 @@ public partial class MainWindow : Window
                 await PreviewWeb.EnsureCoreWebView2Async(environment);
                 PreviewWeb.Source = new Uri(dialog.FileName);
                 SetDynamicButtons(false);
+                PreviewFitButton.IsEnabled = true;
+                PreviewFullscreenButton.IsEnabled = false;
                 PreviewLabel.Text = $"VISTA PREVIA · {Path.GetExtension(dialog.FileName).TrimStart('.').ToUpperInvariant()}";
                 StatusText.Text = "Archivo abierto con WebView2. Si Windows o Edge pueden mostrarlo, podrás usarlo como fondo.";
             }
@@ -103,6 +106,8 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             _imagePath = null; _dynamicPath = null; SetDynamicButtons(false);
+            PreviewFitButton.IsEnabled = false;
+            PreviewFullscreenButton.IsEnabled = false;
             System.Windows.MessageBox.Show($"No pude abrir este archivo como imagen ni con WebView2.\n\n{ex.Message}", "FondoClaro", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
@@ -156,7 +161,6 @@ public partial class MainWindow : Window
                 };
                 _wallpaperHost.Show();
                 SetDynamicButtons(true, canPause: true);
-                _hasActiveWallpaper = true;
                 PreviewFitButton.IsEnabled = true;
                 PreviewFullscreenButton.IsEnabled = true;
                 RemoveBackgroundButton.IsEnabled = true;
@@ -165,7 +169,6 @@ public partial class MainWindow : Window
             }
             if (_imagePath is null) { StatusText.Text = "Elige primero un archivo de fondo."; return; }
             ApplyStaticImage(_imagePath);
-            _hasActiveWallpaper = true;
             PreviewFitButton.IsEnabled = true;
             PreviewFullscreenButton.IsEnabled = true;
         }
@@ -376,7 +379,6 @@ public partial class MainWindow : Window
             _originalMonitorWallpapers.Clear();
             _imagePath = null; _dynamicPath = null;
             _renderedWallpaperPath = null;
-            _hasActiveWallpaper = false;
             PreviewFitButton.IsEnabled = false;
             PreviewFullscreenButton.IsEnabled = false;
             RemoveBackgroundButton.IsEnabled = false;
