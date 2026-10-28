@@ -258,23 +258,37 @@ public partial class WallpaperHostWindow : Window
         var progman = FindWindow("Progman", null);
         if (progman == IntPtr.Zero) throw new InvalidOperationException("Windows no encontró el escritorio.");
 
-        // Parent the HTML host to the shell desktop and put it at the bottom
-        // of that parent's child z-order. This keeps SHELLDLL_DefView icons above it.
-        SendMessageTimeout(progman, 0x052C, IntPtr.Zero, IntPtr.Zero, 0, 1000, out _);
-        var shellView = FindWindowEx(progman, IntPtr.Zero, "SHELLDLL_DefView", null);
-        if (shellView != IntPtr.Zero) return progman;
+        // Ask Explorer to create its wallpaper WorkerW. The documented shell
+        // message is parameter-sensitive: zero parameters can leave no WorkerW
+        // behind SHELLDLL_DefView, causing an HTML host to cover desktop icons.
+        SendMessageTimeout(progman, 0x052C, new IntPtr(0xD), new IntPtr(0x1), 0, 1000, out _);
 
         var desktopParent = IntPtr.Zero;
         EnumWindows((top, _) =>
         {
-            if (FindWindowEx(top, IntPtr.Zero, "SHELLDLL_DefView", null) != IntPtr.Zero)
+            if (FindWindowEx(top, IntPtr.Zero, "SHELLDLL_DefView", null) == IntPtr.Zero)
+                return true;
+
+            // The WorkerW immediately after the icon-view window in top-level
+            // z-order is the wallpaper layer, beneath desktop icons.
+            desktopParent = FindWindowEx(IntPtr.Zero, top, "WorkerW", null);
+            if (desktopParent == IntPtr.Zero)
             {
+                // Some Windows builds host the icon view directly in Progman.
+                // As a fallback, parent to its container and insert at HWND_BOTTOM.
                 desktopParent = top;
-                return false;
             }
-            return true;
+            return false;
         }, IntPtr.Zero);
+
         if (desktopParent != IntPtr.Zero) return desktopParent;
+
+        // Explorer may place SHELLDLL_DefView directly in Progman on some
+        // Windows 11 configurations. A bottom child of Progman remains below
+        // its icon-view child and preserves normal app z-order.
+        if (FindWindowEx(progman, IntPtr.Zero, "SHELLDLL_DefView", null) != IntPtr.Zero)
+            return progman;
+
         throw new InvalidOperationException("Windows no encontró la capa de iconos del escritorio.");
     }
 
