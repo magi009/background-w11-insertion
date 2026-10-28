@@ -7,9 +7,10 @@ Companion desktop build using Avalonia. The Windows WPF app remains in `src/`.
 - Image wallpaper setting through the desktop environment on GNOME, KDE Plasma, Cinnamon, MATE, and XFCE.
 - Image preview with fit and fill modes.
 - HTML wallpaper behind desktop icons on an X11 session using the EWMH desktop-window hint.
+- Pause/resume CSS animations and media, and rotate a list of images on a chosen interval.
 - Fullscreen HTML/image window, preview, and restoration of the previous image wallpaper when it can be read from the desktop configuration.
 
-Wayland does not expose a portable API for an ordinary application to position a window behind desktop icons. In this version, HTML wallpaper mode reports that limitation instead of claiming that it has been applied. The image wallpaper mode still uses the desktop's native settings.
+Wayland does not expose a portable API for an ordinary application to position a window behind desktop icons. In this version, HTML wallpaper mode reports that limitation instead of claiming that it has been applied. The image wallpaper mode still uses the desktop's native settings. A global hotkey is not included in the Linux build.
 
 ## Build
 
