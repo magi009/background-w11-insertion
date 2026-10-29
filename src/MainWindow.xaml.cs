@@ -156,8 +156,7 @@ public partial class MainWindow : Window
                 _wallpaperHost = new WallpaperHostWindow(_dynamicPath, htmlContent: true);
                 _wallpaperHost.TaskbarShown += () =>
                 {
-                    StatusText.Text = "Apps e iconos visibles; el fondo HTML sigue activo.";
-                    WindowState = WindowState.Minimized;
+                    StatusText.Text = "Apps e iconos visibles; el fondo HTML sigue activo. La ventana de FondoClaro permanece abierta.";
                 };
                 _wallpaperHost.Show();
                 SetDynamicButtons(true, canPause: true);
